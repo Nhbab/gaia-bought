@@ -1,0 +1,67 @@
+name: Merge Gaia GUI with New Linux Kernel
+
+on:
+  push:
+    branches: [ main ]
+
+jobs:
+  build-merged-iso:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout Gaia GUI Code
+      uses: actions/checkout@v4
+
+    - name: Install ISO Building Tools
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y live-build xorriso squashfs-tools
+
+    - name: Initialize Linux Base System
+      run: |
+        mkdir -p live-os
+        cd live-os
+        # Cấu hình sử dụng Debian Bookworm (Nhân Linux mới, nhận mọi phần cứng PC)
+        lb config --architectures amd64 --distribution bookworm --archive-areas "main contrib non-free-firmware"
+
+    - name: Configure Pre-installed Packages (Firefox & Xorg)
+      run: |
+        cd live-os
+        mkdir -p config/package-lists
+        # Cài đặt nền tảng hiển thị siêu nhẹ (Xorg, Openbox, nodm) và trình duyệt Firefox hiện đại
+        echo "xorg openbox nodm firefox-esr" > config/package-lists/desktop.list.chroot
+
+    - name: Merge Gaia GUI into Linux System Files
+      run: |
+        cd live-os
+        # Tạo thư mục chứa GUI trong phân vùng hệ thống của Linux
+        mkdir -p config/includes.chroot/etc/skel/gaia-gui
+        
+        # Gộp mã nguồn GUI từ repo vào ISO
+        cp -r ../css ../js ../index.html ../manifest.json config/includes.chroot/etc/skel/gaia-gui/
+
+    - name: Configure Auto-Start (Boot directly into Gaia GUI)
+      run: |
+        cd live-os
+        mkdir -p config/includes.chroot/etc/skel/.config/openbox
+        
+        # Tạo lệnh ép hệ điều hành mở thẳng Firefox ở chế độ Kiosk chạy Gaia GUI khi bật máy
+        cat << 'EOF' > config/includes.chroot/etc/skel/.config/openbox/autostart
+        # Tự động ẩn con trỏ chuột khi không dùng để giống OS thực thụ
+        unclutter -idle 2 &
+        # Chạy Firefox hiện đại toàn màn hình với lõi giao diện của bạn
+        firefox --kiosk /etc/skel/gaia-gui/index.html &
+        EOF
+        
+        chmod +x config/includes.chroot/etc/skel/.config/openbox/autostart
+
+    - name: Build Final Merged ISO
+      run: |
+        cd live-os
+        sudo lb build
+
+    - name: Upload Merged OS ISO
+      uses: actions/upload-artifact@v4
+      with:
+        name: GaiaOS-Competitive-ChromeOS
+        path: live-os/*.iso
