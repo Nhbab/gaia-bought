@@ -1,7 +1,9 @@
 name: Merge Gaia GUI with New Linux Kernel
 
 on:
+  workflow_dispatch: # Cho phép bạn kích hoạt thủ công từ iPhone
   push:
+  
     branches: [ main ]
 
 jobs:
