@@ -1,59 +1,67 @@
-name: Manual Compile Windows EXE (NW.js v0.112.0)
+name: Compile and Release Windows EXE
 
 on:
   workflow_dispatch:
   push:
-    branches: [ master ] # Targets your default master branch configuration
+    branches: [ master ]
+
+permissions:
+  contents: write # Grants the workflow permission to create a GitHub Release
 
 jobs:
-  build-windows-exe:
+  build-and-release:
     runs-on: windows-latest
 
     steps:
     - name: Checkout Repository Code
       uses: actions/checkout@v4
 
-    - name: Download Specific NW.js v0.112.0 Windows Engine Core
+    - name: Speed-Download NW.js v0.112.0 Engine Core
       shell: bash
       run: |
-        # Pull down the exact runtime binary package specified
-        curl -L https://dl.nwjs.io/v0.112.0/nwjs-v0.112.0-win-x64.zip -o nwjs.zip
-        unzip nwjs.zip
+        # Retains your exact requested core engine distribution download link
+        curl -L --connect-timeout 20 --retry 5 \
+          "https://dl.nwjs.io/v0.112.0/nwjs-v0.112.0-win-x64.zip" -o nwjs.zip
+        
+        # Unpack files instantly using native high-speed tar tools
+        tar -xf nwjs.zip
         mv nwjs-v0.112.0-win-x64 nwjs-runtime
+        rm nwjs.zip
 
     - name: Package Gaia Interface using Native PowerShell
       shell: powershell
       run: |
-        # Safely packs files inside homescreen without throwing missing utility errors
         Compress-Archive -Path "apps\homescreen\*" -DestinationPath "gaia-app.zip" -Force
         Rename-Item -Path "gaia-app.zip" -NewName "gaia-app.nw"
 
     - name: Fuse GUI Archive Directly into Native Executable Header
       shell: cmd
       run: |
-        # Stitch your packaged code directly onto the binary wrapper execution block
         copy /b nwjs-runtime\nw.exe + gaia-app.nw nwjs-runtime\GaiaBoughtOS.exe
 
-    - name: Assemble Windows Production Distribution (Fixes Missing nw.pak Error)
+    - name: Assemble Windows Production Distribution Folder
       shell: bash
       run: |
         mkdir dist-exe
-        
-        # 1. Isolate and copy your newly fused standalone core engine out
         cp nwjs-runtime/GaiaBoughtOS.exe dist-exe/
-        
-        # 2. Universal catch-all for libraries, locales, data assets, and structural dependencies
-        # This copies everything needed by v0.112.0 without targeting dead specific files
         cp nwjs-runtime/*.dll dist-exe/ 2>/dev/null || true
         cp nwjs-runtime/*.dat dist-exe/ 2>/dev/null || true
         cp nwjs-runtime/*.bin dist-exe/ 2>/dev/null || true
-        
-        # 3. Safely copy vital sub-folders if they exist in this runtime version
-        if [ -d "nwjs-runtime/locales" ]; then cp -r nwjs-runtime/locales dist-exe/; fi
-        if [ -d "nwjs-runtime/swiftshader" ]; then cp -r nwjs-runtime/swiftshader dist-exe/; fi
 
-    - name: Deploy Compiled Executable Build to GitHub Artifacts
-      uses: actions/upload-artifact@v4
+    - name: Generate Lightweight Distribution Zip File
+      shell: powershell
+      run: |
+        # Creates a single deployment zip for the Release page without double compression slowdowns
+        Compress-Archive -Path "dist-exe\*" -DestinationPath "GaiaBoughtOS-win-x64.zip" -Force
+
+    - name: Create Automated GitHub Release
+      uses: softprops/action-gh-release@v2
       with:
-        name: GaiaBought-Windows-EXE-v0.112.0
-        path: dist-exe/
+        tag_name: v1.0.${{ github.run_number }}
+        name: GaiaBought Desktop Release v1.0.${{ github.run_number }}
+        body: |
+          Automated desktop environment build for your legacy computer setup.
+          Compiled using NW.js core engine layer version v0.112.0.
+        files: GaiaBoughtOS-win-x64.zip
+        draft: false
+        prerelease: false
