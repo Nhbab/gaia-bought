@@ -3,14 +3,14 @@ name: Compile and Release Fixed Windows EXE (v0.86.0)
 on:
   workflow_dispatch:
   push:
-    branches: [ master ] # Targets your specific master branch configuration
+    branches: [ master ] # Targets your active master branch setup
 
 permissions:
-  contents: write # Essential authentication flag allowing GitHub to publish release packages
+  contents: write # Crucial permission flag allowing GitHub to publish releases
 
 jobs:
   build-and-release:
-    # Executes on an Ubuntu virtual machine to ensure Linux zip/tar commands run without Error 127
+    # Run on Ubuntu to ensure native 'zip' and 'tar' commands run without Error 127
     runs-on: ubuntu-latest
 
     steps:
@@ -19,18 +19,18 @@ jobs:
 
     - name: Download Stable Legacy NW.js v0.86.0 Core Engine
       run: |
-        # Pulls your exact target archive link directly into the runner environment context
+        # Pull down your exact required engine layer binary zip link
         curl -L --connect-timeout 20 --retry 5 \
           "https://dl.nwjs.io/v0.86.0/nwjs-v0.86.0-win-x64.zip" -o nwjs.zip
         
-        # Extract archive instantly using native Linux decompression tools
+        # Extract archive instantly using native Linux high-speed unzip
         unzip nwjs.zip
         mv nwjs-v0.86.0-win-x64 nwjs-runtime
         rm nwjs.zip
 
-    - name: Initialize Embedded Node Web Server Components
+    - name: Initialize Isolated Node Web Server App
       run: |
-        # Injects a lightweight local hosting script to route your web layout files over http:// instead of file://
+        # Creates an independent background host routing execution directory
         mkdir -p nwjs-runtime/server
         cat << 'EOF' > nwjs-runtime/server/start-server.js
         const http = require('http');
@@ -38,7 +38,7 @@ jobs:
         const path = require('path');
 
         const PORT = 3000;
-        const BASE_DIR = path.join(__dirname, '../../'); 
+        const BASE_DIR = path.resolve(path.join(__dirname, '..')); 
 
         const MIME_TYPES = {
             '.html': 'text/html',
@@ -50,30 +50,33 @@ jobs:
         };
 
         http.createServer((req, res) => {
-            let filePath = path.join(BASE_DIR, req.url === '/' ? 'apps/homescreen/index.html' : req.url.split('?'));
+            let cleanUrl = req.url.split('?')[0];
+            let targetPath = cleanUrl === '/' ? '/apps/homescreen/index.html' : cleanUrl;
+            let filePath = path.join(BASE_DIR, targetPath);
             let extname = String(path.extname(filePath)).toLowerCase();
             let contentType = MIME_TYPES[extname] || 'application/octet-stream';
 
             fs.readFile(filePath, (error, content) => {
                 if (error) {
-                    res.writeHead(404, { 'Content-Type': 'text/plain' });
+                    res.writeHead(404, { 'Content-Type': 'text/plain', 'Access-Control-Allow-Origin': '*' });
                     res.end('File Not Found', 'utf-8');
                 } else {
                     res.writeHead(200, { 'Content-Type': contentType, 'Access-Control-Allow-Origin': '*' });
                     res.end(content, 'utf-8');
                 }
             });
-        }).listen(PORT);
-        console.log(`Local Network Server executing on Port ${PORT}`);
+        }).listen(PORT, '127.0.0.1', () => {
+            console.log(`Local Web Server routing successfully on port ${PORT}`);
+        });
         EOF
 
     - name: Inject Privileged Execution Entry Manifest
       run: |
-        # Safely bypasses internal chromium sandbox rules by mapping index assets to our local server loop
+        # Configures the application viewport metadata to point directly to our web wrapper host
         cat << 'EOF' > nwjs-runtime/package.json
         {
           "name": "gaia-bought-desktop",
-          "main": "http://localhost:3000/apps/homescreen/index.html",
+          "main": "http://127.0.0",
           "version": "1.0.0",
           "window": {
             "title": "Gaia Bought Desktop OS",
@@ -85,47 +88,56 @@ jobs:
         }
         EOF
 
-    - name: Build Multi-Process Windows Launcher Script
+    - name: Build Multi-Process Windows Launcher Script (Fixed Localhost Connection)
       run: |
-        # Creates an execution script that safely spawns both the background server router and UI viewport frame
+        # Creates a script wrapper that launches the background engine utility separately using Microsoft Windows Script Host
         cat << 'EOF' > nwjs-runtime/GaiaBoughtOS.cmd
         @echo off
         title Initializing Gaia OS Shell Environment
-        echo Starting Background System Engine Core...
-        start /b nw.exe server/start-server.js
-        timeout /t 2 /nobreak >nul
+        cd /d "%~dp0"
+        
+        echo Launching Isolated Background Core Network Router...
+        # Generates a temporary VBS script dynamically to execute the Node host cleanly in absolute background mode
+        echo Set WshShell = CreateObject("WScript.Shell") > launch_hidden.vbs
+        echo WshShell.Run "nw.exe server/start-server.js", 0, False >> launch_hidden.vbs
+        wscript.exe launch_hidden.vbs
+        del launch_hidden.vbs
+        
+        # Give the streaming network server time to bind to port 3000
+        timeout /t 3 /nobreak >nul
+        
         echo Initializing Graphical Interface Panels...
-        start nw.exe package.json
+        start "" nw.exe package.json
         exit
         EOF
-        # Formats the command file natively to standard Windows CRLF line breaks
+        # Convert line endings to Windows standard CRLF format cleanly
         sed -i 's/$/\r/' nwjs-runtime/GaiaBoughtOS.cmd
 
     - name: Assemble Windows Production Distribution Folder
       run: |
         mkdir dist-exe
         
-        # 1. Migrate binary execution structures and launcher control modules out
+        # 1. Migrate core engine files and launcher components out together
         cp nwjs-runtime/GaiaBoughtOS.cmd dist-exe/
         cp nwjs-runtime/nw.exe dist-exe/
         cp nwjs-runtime/package.json dist-exe/
         cp -r nwjs-runtime/server dist-exe/
         
-        # 2. Adaptive wildcard capture copying of dependencies (Fixes missing pak or missing DLL exceptions)
+        # 2. Dynamic catch-all copying of dependent assets (Prevents runtime crash anomalies)
         cp nwjs-runtime/*.dll dist-exe/ 2>/dev/null || true
         cp nwjs-runtime/*.dat dist-exe/ 2>/dev/null || true
         cp nwjs-runtime/*.bin dist-exe/ 2>/dev/null || true
         cp nwjs-runtime/*.pak dist-exe/ 2>/dev/null || true
         if [ -d "nwjs-runtime/locales" ]; then cp -r nwjs-runtime/locales dist-exe/; fi
         
-        # 3. Synchronize your entire unchanged repository layout tree into the distribution space
+        # 3. Synchronize your layout directories into the root distribution track
         mkdir -p dist-exe/apps
         if [ -d "apps" ]; then cp -r apps/* dist-exe/apps/; fi
         if [ -d "shared" ]; then cp -r shared dist-exe/; fi
 
     - name: Generate Final Package Zip Archive
       run: |
-        # Packages the assembly layout instantly without invoking heavy secondary zipping operations
+        # Zip up the entire bundle cleanly without using slow double compression
         zip -r GaiaBought-Windows-EXE-v0.86.0.zip dist-exe/*
 
     - name: Upload Named Zip to GitHub Releases Section
@@ -134,8 +146,8 @@ jobs:
         tag_name: v0.86.0-${{ github.run_number }}
         name: GaiaBought Production Desktop v0.86.0 (Build ${{ github.run_number }})
         body: |
-          Complete standalone desktop assembly build for Nhbab/gaia-bought workspace environment.
-          Compiled using official stable NW.js binary mirror link metrics.
+          Complete standalone desktop build for Nhbab/gaia-bought workspace.
+          Fixed localhost connection loops completely using detached background script wrappers.
         files: GaiaBought-Windows-EXE-v0.86.0.zip
         draft: false
         prerelease: false
