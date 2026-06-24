@@ -16,17 +16,20 @@ jobs:
     - name: Checkout Repository Code
       uses: actions/checkout@v4
 
-    - name: Speed-Download NW.js v0.112.0 Engine Core
+    - name: Download Specific NW.js v0.112.0 Windows Engine Core
       shell: bash
       run: |
-        # Retains your exact requested core engine distribution download link
+        # Fetches your exact required binary download link
         curl -L --connect-timeout 20 --retry 5 \
           "https://dl.nwjs.io/v0.112.0/nwjs-v0.112.0-win-x64.zip" -o nwjs.zip
-        
-        # Unpack files instantly using native high-speed tar tools
-        tar -xf nwjs.zip
-        mv nwjs-v0.112.0-win-x64 nwjs-runtime
-        rm nwjs.zip
+
+    - name: Extract NW.js Zip Using Native Windows Tools (No Tar)
+      shell: powershell
+      run: |
+        # Uses native Windows architecture to unzip the container to avoid corruption
+        Expand-Archive -Path "nwjs.zip" -DestinationPath "." -Force
+        Rename-Item -Path "nwjs-v0.112.0-win-x64" -NewName "nwjs-runtime"
+        Remove-Item -Path "nwjs.zip"
 
     - name: Package Gaia Interface using Native PowerShell
       shell: powershell
@@ -48,20 +51,20 @@ jobs:
         cp nwjs-runtime/*.dat dist-exe/ 2>/dev/null || true
         cp nwjs-runtime/*.bin dist-exe/ 2>/dev/null || true
 
-    - name: Generate Lightweight Distribution Zip File
+    - name: Generate Final Named Package Zip File
       shell: powershell
       run: |
-        # Creates a single deployment zip for the Release page without double compression slowdowns
-        Compress-Archive -Path "dist-exe\*" -DestinationPath "GaiaBoughtOS-win-x64.zip" -Force
+        # Creates the exact target bundle file ready for your release partition
+        Compress-Archive -Path "dist-exe\*" -DestinationPath "GaiaBought-Windows-EXE-v0.112.0.zip" -Force
 
-    - name: Create Automated GitHub Release
+    - name: Upload Named Zip to GitHub Releases Section
       uses: softprops/action-gh-release@v2
       with:
-        tag_name: v1.0.${{ github.run_number }}
-        name: GaiaBought Desktop Release v1.0.${{ github.run_number }}
+        tag_name: v0.112.0-${{ github.run_number }}
+        name: GaiaBought Desktop Release v0.112.0 (Build ${{ github.run_number }})
         body: |
-          Automated desktop environment build for your legacy computer setup.
-          Compiled using NW.js core engine layer version v0.112.0.
-        files: GaiaBoughtOS-win-x64.zip
+          Standalone desktop build for Nhbab/gaia-bought repository.
+          Fuzed using the official NW.js runtime package engine layer.
+        files: GaiaBought-Windows-EXE-v0.112.0.zip
         draft: false
         prerelease: false
