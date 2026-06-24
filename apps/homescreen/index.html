@@ -2,134 +2,97 @@
 <html>
   <head>
     <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, user-scalable=no, initial-scale=1">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
     <meta name="theme-color" content="transparent">
-    <title>Firefox OS Home Screen</title>
+    <title>Gaia Bought Desktop Home Screen</title>
 
-    <!-- Setup environment -->
+    <!-- Native bridge and platform initialization environment scripts -->
     <script defer src="js/setup.js"></script>
+    <script defer src="js/core.js"></script>
+    <script defer src="js/location.js"></script>
+    <script defer src="js/apps.js"></script>
+    <script defer src="js/app.js"></script>
 
-    <!-- Lazy loader -->
-    <script defer src="../shared/js/lazy_loader.js"></script>
-    <!-- <script defer src="js/firstrun.js"></script> -->
-
-    <!-- Async storage -->
-    <script defer src="../shared/js/async_storage.js"></script>
-
-    <!-- PlacesHelper -->
-    <script defer src="../shared/js/places_helper.js"></script>
-
-    <!-- gaia-container -->
-    <script defer src="bower_components/gaia-container/script.js"></script>
-
-    <!-- gaia-site-icon -->
-    <link rel="stylesheet" href="../shared/elements/gaia-site-icon/external/style.css">
-    <script defer src="../shared/elements/gaia-site-icon/script.js"></script>
-
-    <!-- gaia-pin-card -->
-    <script defer src="../shared/js/component_utils.js"></script>
-    <script defer src="../shared/elements/gaia_pin_card/script.js"></script>
-
-    <!-- gaia-components -->
-    <link rel="stylesheet" href="bower_components/base/base.css">
-    <link rel="stylesheet" href="../shared/elements/gaia-theme/gaia-theme.css">
-    <script defer src="bower_components/evt/index.js"></script>
-    <script defer src="bower_components/pressed/pressed.js"></script>
-    <script defer src="../shared/elements/gaia-component/gaia-component.js"></script>
-    <script defer src="bower_components/gaia-dialog/gaia-dialog.js"></script>
-    <script defer src="bower_components/gaia-dialog/gaia-dialog-action.js"></script>
-
-    <!-- gaia l10n -->
-    <script defer src="../shared/js/l10n.js"></script>
-
-    <!-- Local resources -->
-    <link rel="localization" href="locales/homescreen.{locale}.properties">
-
+    <!-- Core styling files -->
     <link rel="stylesheet" href="style/window.css">
     <link rel="stylesheet" href="style/grid.css">
     <link rel="stylesheet" href="style/apps-panel.css">
     <link rel="stylesheet" href="style/pages-panel.css">
 
-    <!-- Process the icons of pinned pages -->
-    <script defer src="../shared/elements/gaia_grid/js/grid_icon_renderer.js"></script>
-    <script defer src="../shared/js/homescreens/icon.js"></script>
-    <script defer src="../shared/js/icons_helper.js"></script>
-    <script defer src="../shared/js/places_helper.js"></script>
+    <!-- Unified modern styling framework layout -->
+    <style>
+      * { box-sizing: border-box; margin: 0; padding: 0; font-family: sans-serif; }
+      body, html { width: 100%; height: 100%; overflow: hidden; background: #121212; color: #fff; }
 
-    <script defer src="js/settings.js"></script>
-    <script defer src="js/appsmetadata.js"></script>
-    <script defer src="js/pinnedplaces.js"></script>
-    <script defer src="js/pages.js"></script>
-    <script defer src="js/homescreen-group.js"></script>
-    <script defer src="js/apps.js"></script>
-    <script defer src="js/window.js"></script>
-    <script defer src="js/bootstrap.js"></script>
+      /* Primary viewport desktop space containing operational apps wrapper */
+      #desktop-container {
+        width: 100%;
+        height: calc(100% - 48px);
+        position: relative;
+        background: linear-gradient(135deg, #0f2027, #203a43, #2c5364);
+      }
+
+      /* Fixed bottom taskbar panel module */
+      #system-taskbar {
+        position: absolute; bottom: 0; left: 0;
+        width: 100%; height: 48px;
+        background: rgba(18, 18, 18, 0.95); border-top: 1px solid rgba(255,255,255,0.05);
+        display: flex; align-items: center; justify-content: space-between; padding: 0 15px; z-index: 1001;
+      }
+      #btn-launcher { padding: 6px 14px; font-size: 14px; background: #0078d4; border: none; color: white; border-radius: 6px; cursor: pointer; font-weight: bold; }
+      #btn-launcher:hover { background: #0086ea; }
+
+      #taskbar-running-tabs { display: flex; gap: 8px; flex-grow: 1; margin-left: 20px; }
+      
+      /* Status notification panel */
+      #system-status-tray { display: flex; align-items: center; gap: 15px; font-size: 13px; color: #cbd5e1; }
+      #btn-power { background: #ff3b30; color: white; border: none; padding: 5px 10px; border-radius: 6px; cursor: pointer; font-weight: bold; }
+      #btn-power:hover { background: #e03126; }
+
+      /* Fixed standard CSS grid overlay fallback matching original metrics */
+      .apps-grid-view {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(90px, 1fr));
+        gap: 25px;
+        padding: 20px;
+        width: 100%;
+      }
+      .gui-hidden { display: none !important; }
+    </style>
   </head>
 
   <body>
-    <header id="page-indicator-header">
-      <div id="page-indicator" data-l10n-id="page-indicator-text" role="slider" aria-valuemin="1" aria-valuenow="1" aria-valuemax="2" aria-controls="panels">
-        <span></span><span></span>
-      </div>
-    </header>
-    <div id="shadow"></div>
-    <div id="panels"><!--
-    --><div id="apps-panel" aria-labelledby="page-indicator-header">
-        <div class="scrollable">
-          <div class="edit-underlay"></div>
-          <gaia-container id="apps" drag-and-drop></gaia-container>
+    <!-- 1. PRIMARY OPERATIONAL HOST VIEWPORT INTERFACE -->
+    <div id="desktop-container"></div>
+
+    <!-- 2. TRADITIONAL GAIA HOMESCREEN APP DRAWER LAYER -->
+    <div id="launcher-menu" class="gui-hidden" style="position: absolute; bottom: 58px; left: 15px; width: 420px; height: 500px; background: rgba(25,25,25,0.95); border-radius: 12px; border: 1px solid #333; padding: 15px; z-index: 1000; overflow-y: auto;">
+      <header id="page-indicator-header" style="margin-bottom: 15px; text-align: center;">
+        <div id="page-indicator" role="slider" aria-valuemin="1" aria-valuenow="1" aria-valuemax="2">
+          <h2 style="font-size: 16px; color: #0078d4;">Gaia Applications Grid</h2>
         </div>
-        <gaia-dialog id="cancel-download" class="dialog-action">
-          <section>
-            <p class="body" data-l10n-id="stop-download-body"></p>
-          </section>
-          <button class="action" data-l10n-id="stop-download-action"></button>
-          <button on-click="close" data-l10n-id="cancel-action"></button>
-        </gaia-dialog>
-        <gaia-dialog id="resume-download" class="dialog-action">
-          <section>
-            <p class="body" data-l10n-id="resume-download-body"></p>
-          </section>
-          <button class="action" data-l10n-id="resume-download-action"></button>
-          <button on-click="close" data-l10n-id="cancel-action"></button>
-        </gaia-dialog>
-        <gaia-dialog id="confirm-unpin-site" class="dialog-action">
-          <section>
-            <p class="body" data-l10n-id="confirm-unpin-body"></p>
-          </section>
-          <button class="action" data-l10n-id="confirm-unpin-action"></button>
-          <button on-click="close" data-l10n-id="cancel-action"></button>
-        </gaia-dialog>
-      </div><!--
-   --><div id="pages-panel" aria-labelledby="page-indicator-header">
-        <div id="empty-pages">
-          <h1 data-l10n-id="no-pinned-pages-header"></h1>
-          <p data-l10n-id="no-pinned-pages-body"></p>
-          <img src="style/images/empty_home_image.png" role="presentation"></img>
-          <div id="boxes" role="presentation">
-            <div></div>
-            <div></div>
-            <div></div>
-            <div></div>
+      </header>
+      
+      <div id="panels">
+        <!-- Replaced gaia-container with standard valid div blocks using original layout hooks -->
+        <div id="apps-panel">
+          <div class="scrollable">
+            <div id="apps" class="apps-grid-view"></div>
           </div>
         </div>
-        <div class="scrollable">
-          <div class="edit-underlay"></div>
-          <gaia-container id="pages"></gaia-container>
-        </div>
-        <gaia-dialog id="confirm-unpin-page" class="dialog-action">
-          <section>
-            <p class="body" data-l10n-id="confirm-unpin-body"></p>
-          </section>
-          <button class="action" data-l10n-id="confirm-unpin-action"></button>
-          <button on-click="close" data-l10n-id="cancel-action"></button>
-        </gaia-dialog>
-      </div><!--
- --></div>
-    <div id="bottombar">
-      <div id="remove"></div>
-      <div id="rename"></div>
-      <div id="done" data-l10n-id="edit-done"></div>
+      </div>
+    </div>
+
+    <!-- 3. UNIFIED PC OPERATIONS TOOLBAR SYSTEM -->
+    <div id="system-taskbar">
+      <button id="btn-launcher" onclick="toggleLauncher()">🎯 Menu</button>
+      <div id="taskbar-running-tabs"></div>
+      <div id="system-status-tray">
+        <span id="tray-location">📍 Detecting Location...</span>
+        <span id="tray-wifi">📶 Online</span>
+        <span id="tray-time">00:00</span>
+        <button id="btn-power" onclick="powerOff()">SHUTDOWN</button>
+      </div>
     </div>
   </body>
 </html>
