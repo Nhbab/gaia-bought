@@ -3,32 +3,32 @@ name: Compile and Release Fixed Windows EXE (v0.86.0)
 on:
   workflow_dispatch:
   push:
-    branches: [ master ] # Targets your active master branch setup
+    branches: [ master ] # Targets your specific master branch configuration
 
 permissions:
-  contents: write # Crucial permission flag allowing GitHub to publish releases
+  contents: write # Essential flag allowing GitHub to publish release packages
 
 jobs:
   build-and-release:
-    # Run on Ubuntu to ensure native 'zip' and 'tar' commands run without Error 127
+    # Executes on an Ubuntu runner to guarantee native zip and folder commands succeed
     runs-on: ubuntu-latest
 
     steps:
     - name: Checkout Repository Code
       uses: actions/checkout@v4
 
-    - name: Download Stable Legacy NW.js v0.86.0 Core Engine
+    - name: Download Exact Legacy NW.js v0.86.0 Core Engine
       run: |
         # Pull down your exact required engine layer binary zip link
         curl -L --connect-timeout 20 --retry 5 \
           "https://dl.nwjs.io/v0.86.0/nwjs-v0.86.0-win-x64.zip" -o nwjs.zip
         
-        # Extract archive instantly using native Linux high-speed unzip
+        # Extract archive instantly using native Linux decompression tools
         unzip nwjs.zip
         mv nwjs-v0.86.0-win-x64 nwjs-runtime
         rm nwjs.zip
 
-    - name: Initialize Isolated Node Web Server App
+    - name: Initialize Embedded Node Web Server Components
       run: |
         # Creates an independent background host routing execution directory
         mkdir -p nwjs-runtime/server
@@ -50,8 +50,8 @@ jobs:
         };
 
         http.createServer((req, res) => {
-            let cleanUrl = req.url.split('?')[0];
-            let targetPath = cleanUrl === '/' ? '/apps/homescreen/index.html' : cleanUrl;
+            let cleanUrl = req.url.split('?');
+            let targetPath = cleanUrl[0] === '/' ? '/apps/homescreen/index.html' : cleanUrl[0];
             let filePath = path.join(BASE_DIR, targetPath);
             let extname = String(path.extname(filePath)).toLowerCase();
             let contentType = MIME_TYPES[extname] || 'application/octet-stream';
@@ -70,9 +70,9 @@ jobs:
         });
         EOF
 
-    - name: Inject Privileged Execution Entry Manifest
+    - name: Inject Privileged Root Execution Manifest
       run: |
-        # Configures the application viewport metadata to point directly to our web wrapper host
+        # Forces Chromium 123 core to turn off hardware graphics sandboxing and local CORS restrictions
         cat << 'EOF' > nwjs-runtime/package.json
         {
           "name": "gaia-bought-desktop",
@@ -82,28 +82,28 @@ jobs:
             "title": "Gaia Bought Desktop OS",
             "toolbar": false,
             "fullscreen": true,
-            "frame": false
+            "frame": false,
+            "show": true
           },
-          "chromium-args": "--disable-web-security --allow-file-access-from-files"
+          "chromium-args": "--disable-web-security --allow-file-access-from-files --disable-gpu-sandbox --mixed-context"
         }
         EOF
 
-    - name: Build Multi-Process Windows Launcher Script (Fixed Localhost Connection)
+    - name: Build Multi-Process Windows Launcher Script (Fixed White Screen)
       run: |
-        # Creates a script wrapper that launches the background engine utility separately using Microsoft Windows Script Host
+        # Launches the server module first, checks connection, then fires up the container layout frame
         cat << 'EOF' > nwjs-runtime/GaiaBoughtOS.cmd
         @echo off
         title Initializing Gaia OS Shell Environment
         cd /d "%~dp0"
         
         echo Launching Isolated Background Core Network Router...
-        # Generates a temporary VBS script dynamically to execute the Node host cleanly in absolute background mode
         echo Set WshShell = CreateObject("WScript.Shell") > launch_hidden.vbs
         echo WshShell.Run "nw.exe server/start-server.js", 0, False >> launch_hidden.vbs
         wscript.exe launch_hidden.vbs
         del launch_hidden.vbs
         
-        # Give the streaming network server time to bind to port 3000
+        echo Waiting for network port binding...
         timeout /t 3 /nobreak >nul
         
         echo Initializing Graphical Interface Panels...
@@ -130,7 +130,7 @@ jobs:
         cp nwjs-runtime/*.pak dist-exe/ 2>/dev/null || true
         if [ -d "nwjs-runtime/locales" ]; then cp -r nwjs-runtime/locales dist-exe/; fi
         
-        # 3. Synchronize your layout directories into the root distribution track
+        # 3. Synchronize your unedited repository layout tree directories into the root distribution track
         mkdir -p dist-exe/apps
         if [ -d "apps" ]; then cp -r apps/* dist-exe/apps/; fi
         if [ -d "shared" ]; then cp -r shared dist-exe/; fi
@@ -147,7 +147,7 @@ jobs:
         name: GaiaBought Production Desktop v0.86.0 (Build ${{ github.run_number }})
         body: |
           Complete standalone desktop build for Nhbab/gaia-bought workspace.
-          Fixed localhost connection loops completely using detached background script wrappers.
+          Fixed localhost white blank rendering restrictions via root flag injections.
         files: GaiaBought-Windows-EXE-v0.86.0.zip
         draft: false
         prerelease: false
