@@ -1,4 +1,4 @@
-name: Compile and Release Windows EXE
+name: Compile and Release Legacy Windows EXE (v0.86.0)
 
 on:
   workflow_dispatch:
@@ -6,7 +6,7 @@ on:
     branches: [ master ]
 
 permissions:
-  contents: write # Grants the workflow permission to create a GitHub Release
+  contents: write # Grants permissions to generate the Release download tag
 
 jobs:
   build-and-release:
@@ -16,19 +16,20 @@ jobs:
     - name: Checkout Repository Code
       uses: actions/checkout@v4
 
-    - name: Download Specific NW.js v0.112.0 Windows Engine Core
+    - name: Download Exact Legacy NW.js v0.86.0 Engine Core
       shell: bash
       run: |
-        # Fetches your exact required binary download link
+        # Pulls down your exact specified older v0.86.0 stable link
         curl -L --connect-timeout 20 --retry 5 \
-          "https://dl.nwjs.io/v0.112.0/nwjs-v0.112.0-win-x64.zip" -o nwjs.zip
+          "https://dl.nwjs.io/v0.86.0/nwjs-v0.86.0-win-x64.zip" -o nwjs.zip
 
-    - name: Extract NW.js Zip Using Native Windows Tools (No Tar)
+    - name: Extract Legacy Runtime Using Native PowerShell
       shell: powershell
       run: |
-        # Uses native Windows architecture to unzip the container to avoid corruption
+        # Unpacks files using native Windows tools to prevent tar extraction faults
         Expand-Archive -Path "nwjs.zip" -DestinationPath "." -Force
-        Rename-Item -Path "nwjs-v0.112.0-win-x64" -NewName "nwjs-runtime"
+        # Renames the version-matched folder correctly to match our fusion setup
+        Rename-Item -Path "nwjs-v0.86.0-win-x64" -NewName "nwjs-runtime"
         Remove-Item -Path "nwjs.zip"
 
     - name: Package Gaia Interface using Native PowerShell
@@ -40,6 +41,7 @@ jobs:
     - name: Fuse GUI Archive Directly into Native Executable Header
       shell: cmd
       run: |
+        # Stitches your code bundle directly onto the older v0.86.0 execution runtime header
         copy /b nwjs-runtime\nw.exe + gaia-app.nw nwjs-runtime\GaiaBoughtOS.exe
 
     - name: Assemble Windows Production Distribution Folder
@@ -50,21 +52,25 @@ jobs:
         cp nwjs-runtime/*.dll dist-exe/ 2>/dev/null || true
         cp nwjs-runtime/*.dat dist-exe/ 2>/dev/null || true
         cp nwjs-runtime/*.bin dist-exe/ 2>/dev/null || true
+        
+        # Legacy version-specific assets package catchall (required for v0.86.0 runtime layers)
+        cp nwjs-runtime/*.pak dist-exe/ 2>/dev/null || true
+        
+        if [ -d "nwjs-runtime/locales" ]; then cp -r nwjs-runtime/locales dist-exe/; fi
 
     - name: Generate Final Named Package Zip File
       shell: powershell
       run: |
-        # Creates the exact target bundle file ready for your release partition
-        Compress-Archive -Path "dist-exe\*" -DestinationPath "GaiaBought-Windows-EXE-v0.112.0.zip" -Force
+        Compress-Archive -Path "dist-exe\*" -DestinationPath "GaiaBought-Windows-EXE-v0.86.0.zip" -Force
 
     - name: Upload Named Zip to GitHub Releases Section
       uses: softprops/action-gh-release@v2
       with:
-        tag_name: v0.112.0-${{ github.run_number }}
-        name: GaiaBought Desktop Release v0.112.0 (Build ${{ github.run_number }})
+        tag_name: v0.86.0-${{ github.run_number }}
+        name: GaiaBought Legacy Desktop Release v0.86.0 (Build ${{ github.run_number }})
         body: |
           Standalone desktop build for Nhbab/gaia-bought repository.
-          Fuzed using the official NW.js runtime package engine layer.
-        files: GaiaBought-Windows-EXE-v0.112.0.zip
+          Optimized for older computer processors using the stable v0.86.0 legacy platform engine layer.
+        files: GaiaBought-Windows-EXE-v0.86.0.zip
         draft: false
         prerelease: false
