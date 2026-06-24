@@ -6,130 +6,211 @@
     <meta name="theme-color" content="transparent">
     <title>Firefox OS Home Screen</title>
 
-    <!-- Setup environment -->
-    <script defer src="js/setup.js"></script>
-
-    <!-- Lazy loader -->
-    <script defer src=" js/lazy_loader.js"></script>
-    <!-- <script defer src="js/firstrun.js"></script> -->
-
-    <!-- Async storage -->
-    <script defer src=" js/async_storage.js"></script>
-
-    <!-- PlacesHelper -->
-    <script defer src=" js/places_helper.js"></script>
-
-    <!-- gaia-container -->
-    <script defer src="bower_components/gaia-container/script.js"></script>
-
-    <!-- gaia-site-icon -->
-    <link rel="stylesheet" href=" elements/gaia-site-icon/external/style.css">
-    <script defer src=" elements/gaia-site-icon/script.js"></script>
-
-    <!-- gaia-pin-card -->
-    <script defer src=" js/component_utils.js"></script>
-    <script defer src=" elements/gaia_pin_card/script.js"></script>
-
-    <!-- gaia-components -->
-    <link rel="stylesheet" href="bower_components/base/base.css">
-    <link rel="stylesheet" href=" elements/gaia-theme/gaia-theme.css">
-    <script defer src="bower_components/evt/index.js"></script>
-    <script defer src="bower_components/pressed/pressed.js"></script>
-    <script defer src=" elements/gaia-component/gaia-component.js"></script>
-    <script defer src="bower_components/gaia-dialog/gaia-dialog.js"></script>
-    <script defer src="bower_components/gaia-dialog/gaia-dialog-action.js"></script>
-
-    <!-- gaia l10n -->
-    <script defer src=" js/l10n.js"></script>
-
-    <!-- Local resources -->
-    <link rel="localization" href="locales/homescreen.{locale}.properties">
-
+    <!-- Core styling files -->
     <link rel="stylesheet" href="style/window.css">
     <link rel="stylesheet" href="style/grid.css">
     <link rel="stylesheet" href="style/apps-panel.css">
     <link rel="stylesheet" href="style/pages-panel.css">
 
-    <!-- Process the icons of pinned pages -->
-    <script defer src=" elements/gaia_grid/js/grid_icon_renderer.js"></script>
-    <script defer src=" js/homescreens/icon.js"></script>
-    <script defer src=" js/icons_helper.js"></script>
-    <script defer src=" js/places_helper.js"></script>
+    <style>
+      /* Mobile Phone Viewport Emulation Frame for PC Display */
+      * { box-sizing: border-box; margin: 0; padding: 0; }
+      body, html { 
+        width: 100%; height: 100%; 
+        overflow: hidden; background: #222; 
+        display: flex; justify-content: center; align-items: center; 
+      }
+      
+      /* Replicates a high-resolution vertical smartphone aspect ratio container */
+      #phone-screen-shell {
+        width: 380px;
+        height: 680px;
+        background: #000;
+        position: relative;
+        border: 12px solid #111;
+        border-radius: 36px;
+        box-shadow: 0 20px 50px rgba(0,0,0,0.8);
+        overflow: hidden;
+      }
 
-    <script defer src="js/settings.js"></script>
-    <script defer src="js/appsmetadata.js"></script>
-    <script defer src="js/pinnedplaces.js"></script>
-    <script defer src="js/pages.js"></script>
-    <script defer src="js/homescreen-group.js"></script>
-    <script defer src="js/apps.js"></script>
-    <script defer src="js/window.js"></script>
-    <script defer src="js/bootstrap.js"></script>
+      /* Original panel layout overrides to align with browser frame metrics */
+      #panels {
+        display: flex;
+        width: 200%;
+        height: calc(100% - 80px);
+        transition: transform 0.3s ease-out;
+      }
+      #apps-panel, #pages-panel {
+        width: 50%;
+        height: 100%;
+        position: relative;
+        overflow-y: auto;
+      }
+      .scrollable { padding: 15px; }
+
+      /* Phone Application Icon Layout Grid */
+      .phone-apps-grid {
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 16px;
+        padding-top: 10px;
+      }
+      .phone-app-card {
+        display: flex; flex-direction: column; align-items: center; cursor: pointer;
+      }
+      .phone-app-card .icon-graphic {
+        width: 52px; height: 52px; background: #333; border-radius: 14px;
+        display: flex; align-items: center; justify-content: center; font-size: 26px;
+        margin-bottom: 6px; box-shadow: 0 4px 8px rgba(0,0,0,0.3);
+      }
+      .phone-app-card .icon-label {
+        font-size: 11px; text-align: center; color: #eee; 
+        max-width: 65px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+      }
+
+      /* Native Active Window Overlay (Simulates launching an app on mobile) */
+      #active-app-overlay {
+        position: absolute; top: 0; left: 0; width: 100%; height: calc(100% - 50px);
+        background: #fff; z-index: 9999;
+      }
+      #active-app-overlay iframe { width: 100%; height: 100%; border: none; }
+
+      /* Mobile Physical Navigation Bottom Bar */
+      #phone-hardware-bar {
+        position: absolute; bottom: 0; left: 0; width: 100%; height: 50px;
+        background: rgba(15,15,15,0.95); border-top: 1px solid #222;
+        display: flex; justify-content: center; align-items: center; z-index: 10000;
+      }
+      #home-button-circle {
+        width: 32px; height: 32px; border-radius: 50%; border: 2px solid #666;
+        background: transparent; cursor: pointer;
+      }
+      #home-button-circle:hover { border-color: #fff; background: rgba(255,255,255,0.1); }
+      
+      .gui-hidden { display: none !important; }
+    </style>
   </head>
 
   <body>
-    <header id="page-indicator-header">
-      <div id="page-indicator" data-l10n-id="page-indicator-text" role="slider" aria-valuemin="1" aria-valuenow="1" aria-valuemax="2" aria-controls="panels">
-        <span></span><span></span>
-      </div>
-    </header>
-    <div id="shadow"></div>
-    <div id="panels"><!--
-    --><div id="apps-panel" aria-labelledby="page-indicator-header">
-        <div class="scrollable">
-          <div class="edit-underlay"></div>
-          <gaia-container id="apps" drag-and-drop></gaia-container>
+    <!-- PHONE BOUNDARY EMULATION FRAME -->
+    <div id="phone-screen-shell">
+      
+      <!-- HEADER STATUS NOTIFICATION STRIP -->
+      <header id="page-indicator-header" style="height: 30px; background: rgba(0,0,0,0.5); display: flex; align-items: center; justify-content: center; font-size: 11px; color: #888;">
+        <div id="page-indicator" role="slider" aria-valuemin="1" aria-valuenow="1" aria-valuemax="2" aria-controls="panels">
+          <span style="cursor: pointer; font-weight: bold; color: #fff;" onclick="switchScreen(0)">● Apps</span> &nbsp; 
+          <span style="cursor: pointer;" onclick="switchScreen(1)">○ Pinned</span>
         </div>
-        <gaia-dialog id="cancel-download" class="dialog-action">
-          <section>
-            <p class="body" data-l10n-id="stop-download-body"></p>
-          </section>
-          <button class="action" data-l10n-id="stop-download-action"></button>
-          <button on-click="close" data-l10n-id="cancel-action"></button>
-        </gaia-dialog>
-        <gaia-dialog id="resume-download" class="dialog-action">
-          <section>
-            <p class="body" data-l10n-id="resume-download-body"></p>
-          </section>
-          <button class="action" data-l10n-id="resume-download-action"></button>
-          <button on-click="close" data-l10n-id="cancel-action"></button>
-        </gaia-dialog>
-        <gaia-dialog id="confirm-unpin-site" class="dialog-action">
-          <section>
-            <p class="body" data-l10n-id="confirm-unpin-body"></p>
-          </section>
-          <button class="action" data-l10n-id="confirm-unpin-action"></button>
-          <button on-click="close" data-l10n-id="cancel-action"></button>
-        </gaia-dialog>
-      </div><!--
-   --><div id="pages-panel" aria-labelledby="page-indicator-header">
-        <div id="empty-pages">
-          <h1 data-l10n-id="no-pinned-pages-header"></h1>
-          <p data-l10n-id="no-pinned-pages-body"></p>
-          <img src="style/images/empty_home_image.png" role="presentation"></img>
-          <div id="boxes" role="presentation">
-            <div></div>
-            <div></div>
-            <div></div>
-            <div></div>
+      </header>
+
+      <!-- SEAMLESS IFRAME APP LAUNCHER OVERLAY LAYER -->
+      <div id="active-app-overlay" class="gui-hidden">
+        <iframe id="phone-app-runner" src="about:blank"></iframe>
+      </div>
+
+      <!-- MAIN PHONE PANELS VIEWPORT SLIDER -->
+      <div id="shadow"></div>
+      <div id="panels">
+        
+        <!-- PANEL 1: TARGET APPS PHONE DRAWER GRID -->
+        <div id="apps-panel" aria-labelledby="page-indicator-header">
+          <div class="scrollable">
+            <div class="edit-underlay"></div>
+            <!-- The Javascript injection engine hooks straight into this original container item ID -->
+            <div id="apps" class="phone-apps-grid"></div>
           </div>
         </div>
-        <div class="scrollable">
-          <div class="edit-underlay"></div>
-          <gaia-container id="pages"></gaia-container>
+
+        <!-- PANEL 2: TARGET PINNED PAGES PRESERVED FROM ORIGINAL LAYOUT -->
+        <div id="pages-panel" aria-labelledby="page-indicator-header">
+          <div id="empty-pages" style="padding: 40px 20px; text-align: center; color: #666;">
+            <h1 style="font-size: 16px; margin-bottom: 8px;">No Bookmarked Pages</h1>
+            <p style="font-size: 12px;">Long press application items inside your workspace grid to pin items.</p>
+          </div>
+          <div class="scrollable">
+            <div class="edit-underlay"></div>
+            <div id="pages"></div>
+          </div>
         </div>
-        <gaia-dialog id="confirm-unpin-page" class="dialog-action">
-          <section>
-            <p class="body" data-l10n-id="confirm-unpin-body"></p>
-          </section>
-          <button class="action" data-l10n-id="confirm-unpin-action"></button>
-          <button on-click="close" data-l10n-id="cancel-action"></button>
-        </gaia-dialog>
-      </div><!--
- --></div>
-    <div id="bottombar">
-      <div id="remove"></div>
-      <div id="rename"></div>
-      <div id="done" data-l10n-id="edit-done"></div>
+
+      </div>
+
+      <!-- PHYSICAL PHONE SOFT HOME BUTTON NAVIGATION BAR BAR -->
+      <div id="phone-hardware-bar">
+        <button id="home-button-circle" onclick="closeActiveApp()" title="Home Button"></button>
+      </div>
+
     </div>
+
+    <!-- IMPLEMENT LOCAL DATA MATRIX OVERRIDES AND CORE LOOP FLOWS -->
+    <script>
+      // 1. Sliding Page Controller (App Drawer <-> Pinned Pages)
+      window.switchScreen = function(pageIndex) {
+        const panels = document.getElementById('panels');
+        if (panels) {
+            panels.style.transform = `translateX(-${pageIndex * 50}%)`;
+        }
+      };
+
+      // 2. Active Application Lifecycle Routing Framework
+      window.launchPhoneApp = function(url) {
+          const overlay = document.getElementById('active-app-overlay');
+          const runner = document.getElementById('phone-app-runner');
+          if (overlay && runner) {
+              runner.src = url;
+              overlay.classList.remove('gui-hidden');
+          }
+      };
+
+      window.closeActiveApp = function() {
+          const overlay = document.getElementById('active-app-overlay');
+          const runner = document.getElementById('phone-app-runner');
+          if (overlay && runner) {
+              overlay.classList.add('gui-hidden');
+              runner.src = 'about:blank'; // Free memory process
+          }
+      };
+
+      // 3. Mock Firefox OS Framework API hooks to prevent script load drops
+      if (!window.Settings) {
+        window.Settings = function() { this.small = false; this.scrollSnapping = false; };
+        window.Settings.prototype.save = function() {};
+      }
+      
+      if (!window.AppsMetadata) {
+        window.AppsMetadata = function() {};
+        window.AppsMetadata.prototype.init = function() { return Promise.resolve(); };
+        window.AppsMetadata.prototype.getAll = function(callback) {
+          // Traditional Firefox mobile ecosystem application suite catalog
+          const phoneSuite = [
+            { id: 'dialer', name: 'Phone', url: 'https://bing.com', icon: '📞' },
+            { id: 'sms', name: 'Messages', url: 'about:blank', icon: '✉️' },
+            { id: 'browser', name: 'Browser', url: 'https://google.com', icon: '🌐' },
+            { id: 'gallery', name: 'Gallery', url: 'about:blank', icon: '📷' },
+            { id: 'youtube', name: 'YouTube', url: 'https://youtube.com', icon: '🎬' },
+            { id: 'wikipedia', name: 'Wikipedia', url: 'https://wikipedia.org', icon: '📚' },
+            { id: 'settings', name: 'Settings', url: 'about:blank', icon: '⚙️' }
+          ];
+          phoneSuite.forEach(app => callback(app));
+          return Promise.resolve();
+        };
+      }
+      
+      if (!window.PinnedPlaces) {
+        window.PinnedPlaces = function() {};
+        window.PinnedPlaces.prototype.init = function() { return Promise.resolve(); };
+      }
+
+      // Emergency key hook window handler for NW.js wrapper interface (Shift+Escape)
+      if (typeof nw !== 'undefined') {
+          window.addEventListener('keydown', (e) => {
+              if (e.key === 'Escape' && e.shiftKey) nw.App.quit();
+          });
+      }
+    </script>
+
+    <!-- Link your localized setup.js and apps.js scripts natively -->
+    <script src="js/setup.js"></script>
+    <script src="js/apps.js"></script>
   </body>
 </html>
