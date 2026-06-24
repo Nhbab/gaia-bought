@@ -1,76 +1,141 @@
-name: Compile and Release Legacy Windows EXE (v0.86.0)
+name: Compile and Release Fixed Windows EXE (v0.86.0)
 
 on:
   workflow_dispatch:
   push:
-    branches: [ master ]
+    branches: [ master ] # Targets your specific master branch configuration
 
 permissions:
-  contents: write # Grants permissions to generate the Release download tag
+  contents: write # Essential authentication flag allowing GitHub to publish release packages
 
 jobs:
   build-and-release:
-    runs-on: windows-latest
+    # Executes on an Ubuntu virtual machine to ensure Linux zip/tar commands run without Error 127
+    runs-on: ubuntu-latest
 
     steps:
     - name: Checkout Repository Code
       uses: actions/checkout@v4
 
-    - name: Download Exact Legacy NW.js v0.86.0 Engine Core
-      shell: bash
+    - name: Download Stable Legacy NW.js v0.86.0 Core Engine
       run: |
-        # Pulls down your exact specified older v0.86.0 stable link
+        # Pulls your exact target archive link directly into the runner environment context
         curl -L --connect-timeout 20 --retry 5 \
           "https://dl.nwjs.io/v0.86.0/nwjs-v0.86.0-win-x64.zip" -o nwjs.zip
+        
+        # Extract archive instantly using native Linux decompression tools
+        unzip nwjs.zip
+        mv nwjs-v0.86.0-win-x64 nwjs-runtime
+        rm nwjs.zip
 
-    - name: Extract Legacy Runtime Using Native PowerShell
-      shell: powershell
+    - name: Initialize Embedded Node Web Server Components
       run: |
-        # Unpacks files using native Windows tools to prevent tar extraction faults
-        Expand-Archive -Path "nwjs.zip" -DestinationPath "." -Force
-        # Renames the version-matched folder correctly to match our fusion setup
-        Rename-Item -Path "nwjs-v0.86.0-win-x64" -NewName "nwjs-runtime"
-        Remove-Item -Path "nwjs.zip"
+        # Injects a lightweight local hosting script to route your web layout files over http:// instead of file://
+        mkdir -p nwjs-runtime/server
+        cat << 'EOF' > nwjs-runtime/server/start-server.js
+        const http = require('http');
+        const fs = require('fs');
+        const path = require('path');
 
-    - name: Package Gaia Interface using Native PowerShell
-      shell: powershell
-      run: |
-        Compress-Archive -Path "apps\homescreen\*" -DestinationPath "gaia-app.zip" -Force
-        Rename-Item -Path "gaia-app.zip" -NewName "gaia-app.nw"
+        const PORT = 3000;
+        const BASE_DIR = path.join(__dirname, '../../'); 
 
-    - name: Fuse GUI Archive Directly into Native Executable Header
-      shell: cmd
+        const MIME_TYPES = {
+            '.html': 'text/html',
+            '.css': 'text/css',
+            '.js': 'text/javascript',
+            '.json': 'application/json',
+            '.png': 'image/png',
+            '.properties': 'text/plain'
+        };
+
+        http.createServer((req, res) => {
+            let filePath = path.join(BASE_DIR, req.url === '/' ? 'apps/homescreen/index.html' : req.url.split('?'));
+            let extname = String(path.extname(filePath)).toLowerCase();
+            let contentType = MIME_TYPES[extname] || 'application/octet-stream';
+
+            fs.readFile(filePath, (error, content) => {
+                if (error) {
+                    res.writeHead(404, { 'Content-Type': 'text/plain' });
+                    res.end('File Not Found', 'utf-8');
+                } else {
+                    res.writeHead(200, { 'Content-Type': contentType, 'Access-Control-Allow-Origin': '*' });
+                    res.end(content, 'utf-8');
+                }
+            });
+        }).listen(PORT);
+        console.log(`Local Network Server executing on Port ${PORT}`);
+        EOF
+
+    - name: Inject Privileged Execution Entry Manifest
       run: |
-        # Stitches your code bundle directly onto the older v0.86.0 execution runtime header
-        copy /b nwjs-runtime\nw.exe + gaia-app.nw nwjs-runtime\GaiaBoughtOS.exe
+        # Safely bypasses internal chromium sandbox rules by mapping index assets to our local server loop
+        cat << 'EOF' > nwjs-runtime/package.json
+        {
+          "name": "gaia-bought-desktop",
+          "main": "http://localhost:3000/apps/homescreen/index.html",
+          "version": "1.0.0",
+          "window": {
+            "title": "Gaia Bought Desktop OS",
+            "toolbar": false,
+            "fullscreen": true,
+            "frame": false
+          },
+          "chromium-args": "--disable-web-security --allow-file-access-from-files"
+        }
+        EOF
+
+    - name: Build Multi-Process Windows Launcher Script
+      run: |
+        # Creates an execution script that safely spawns both the background server router and UI viewport frame
+        cat << 'EOF' > nwjs-runtime/GaiaBoughtOS.cmd
+        @echo off
+        title Initializing Gaia OS Shell Environment
+        echo Starting Background System Engine Core...
+        start /b nw.exe server/start-server.js
+        timeout /t 2 /nobreak >nul
+        echo Initializing Graphical Interface Panels...
+        start nw.exe package.json
+        exit
+        EOF
+        # Formats the command file natively to standard Windows CRLF line breaks
+        sed -i 's/$/\r/' nwjs-runtime/GaiaBoughtOS.cmd
 
     - name: Assemble Windows Production Distribution Folder
-      shell: bash
       run: |
         mkdir dist-exe
-        cp nwjs-runtime/GaiaBoughtOS.exe dist-exe/
+        
+        # 1. Migrate binary execution structures and launcher control modules out
+        cp nwjs-runtime/GaiaBoughtOS.cmd dist-exe/
+        cp nwjs-runtime/nw.exe dist-exe/
+        cp nwjs-runtime/package.json dist-exe/
+        cp -r nwjs-runtime/server dist-exe/
+        
+        # 2. Adaptive wildcard capture copying of dependencies (Fixes missing pak or missing DLL exceptions)
         cp nwjs-runtime/*.dll dist-exe/ 2>/dev/null || true
         cp nwjs-runtime/*.dat dist-exe/ 2>/dev/null || true
         cp nwjs-runtime/*.bin dist-exe/ 2>/dev/null || true
-        
-        # Legacy version-specific assets package catchall (required for v0.86.0 runtime layers)
         cp nwjs-runtime/*.pak dist-exe/ 2>/dev/null || true
-        
         if [ -d "nwjs-runtime/locales" ]; then cp -r nwjs-runtime/locales dist-exe/; fi
+        
+        # 3. Synchronize your entire unchanged repository layout tree into the distribution space
+        mkdir -p dist-exe/apps
+        if [ -d "apps" ]; then cp -r apps/* dist-exe/apps/; fi
+        if [ -d "shared" ]; then cp -r shared dist-exe/; fi
 
-    - name: Generate Final Named Package Zip File
-      shell: powershell
+    - name: Generate Final Package Zip Archive
       run: |
-        Compress-Archive -Path "dist-exe\*" -DestinationPath "GaiaBought-Windows-EXE-v0.86.0.zip" -Force
+        # Packages the assembly layout instantly without invoking heavy secondary zipping operations
+        zip -r GaiaBought-Windows-EXE-v0.86.0.zip dist-exe/*
 
     - name: Upload Named Zip to GitHub Releases Section
       uses: softprops/action-gh-release@v2
       with:
         tag_name: v0.86.0-${{ github.run_number }}
-        name: GaiaBought Legacy Desktop Release v0.86.0 (Build ${{ github.run_number }})
+        name: GaiaBought Production Desktop v0.86.0 (Build ${{ github.run_number }})
         body: |
-          Standalone desktop build for Nhbab/gaia-bought repository.
-          Optimized for older computer processors using the stable v0.86.0 legacy platform engine layer.
+          Complete standalone desktop assembly build for Nhbab/gaia-bought workspace environment.
+          Compiled using official stable NW.js binary mirror link metrics.
         files: GaiaBought-Windows-EXE-v0.86.0.zip
         draft: false
         prerelease: false
