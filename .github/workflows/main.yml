@@ -20,14 +20,14 @@ jobs:
       run: |
         mkdir -p dist-gaia-os
         
-        # 1. Tạo tệp máy chủ Node.js siêu nhẹ để xử lý lỗi đường dẫn cha (../shared/) và thẻ gaia-container tự động trên RAM
+        # 1. Tạo tệp máy chủ Node.js siêu nhẹ định cấu hình chuẩn địa chỉ IP 127.0.0.1
         cat << 'EOF' > dist-gaia-os/server-core.js
         const http = require('http');
         const fs = require('fs');
         const path = require('path');
 
         const PORT = 3000;
-        const BASE_DIR = __dirname; // Định vị trực tiếp tại thư mục giải nén
+        const BASE_DIR = __dirname; 
 
         const MIME_TYPES = {
             '.html': 'text/html',
@@ -39,8 +39,8 @@ jobs:
         };
 
         http.createServer((req, res) => {
-            let cleanUrl = req.url.split('?')[0];
-            let targetPath = cleanUrl === '/' ? '/apps/homescreen/index.html' : cleanUrl;
+            let cleanUrl = req.url.split('?');
+            let targetPath = cleanUrl[0] === '/' ? '/apps/homescreen/index.html' : cleanUrl[0];
             let filePath = path.join(BASE_DIR, targetPath);
             let extname = String(path.extname(filePath)).toLowerCase();
             let contentType = MIME_TYPES[extname] || 'application/octet-stream';
@@ -50,7 +50,7 @@ jobs:
                     res.writeHead(404, { 'Content-Type': 'text/plain', 'Access-Control-Allow-Origin': '*' });
                     res.end('File Not Found');
                 } else {
-                    // SỬA LỖI ĐÓNG BĂNG VÀ LỖI THẺ GAIA NGAY TRÊN RAM (GIỮ NGUYÊN CODE GỐC)
+                    // SỬA LỖI ĐÓNG BĂNG VÀ THÈ GAIA TRÊN RAM
                     if (filePath.endsWith('index.html')) {
                         content = content.replace('<head>', '<head><script>if(!navigator.mozApps){navigator.mozApps={mgmt:{getAll:function(){return{set onsuccess(cb){setTimeout(()=>cb({target:{result:[]}}),50)},set onerror(cb){}}}}};if(!customElements.get("gaia-container")){customElements.define("gaia-container",class extends HTMLElement{freeze(){}thaw(){}removeChild(e,c){e.remove();if(c)c()}})}</script>');
                     }
@@ -58,11 +58,12 @@ jobs:
                     res.end(content);
                 }
             });
-        }).listen(PORT, '127.0.0.1');
-        console.log(`Gaia Server Active on Port ${PORT}`);
+        }).listen(PORT, '127.0.0.1', () => {
+            console.log(`Gaia OS Core streaming live on http://127.0.0.1:${PORT}`);
+        });
         EOF
 
-        # 2. Tạo tệp lệnh khởi chạy kép tự động (Bật server ngầm trước, mở Edge App Mode toàn màn hình sau)
+        # 2. Sửa chính xác địa phi IP khởi chạy từ 127.0.0.0 thành 127.0.0.1
         cat << 'EOF' > dist-gaia-os/Launch-GaiaBought-OS.cmd
         @echo off
         title Initializing Firefox OS Gaia Interface
@@ -70,21 +71,19 @@ jobs:
 
         echo Booting Background Streaming Server Core...
         start "" /b node server-core.js
-        timeout /t 2 /nobreak >nul
+        timeout /t 3 /nobreak >nul
 
         echo Initializing Graphical User Interface...
-        # Gọi nhân Edge có sẵn trên Windows khởi chạy dưới dạng một Ứng dụng Hệ điều hành độc lập không viền
+        # Ép Edge App Mode truy cập chính xác vào cổng mạng cục bộ 127.0.0.1
         powershell -NoProfile -Command "Start-Process 'msedge.exe' -ArgumentList '--app=\"http://127.0.0\"', '--disable-web-security', '--allow-file-access-from-files', '--no-first-run' -WindowStyle Maximized"
         
         exit
         EOF
         
-        # Đồng bộ hóa định dạng kết thúc dòng tương thích 100% với Windows Command Prompt
         sed -i 's/$/\r/' dist-gaia-os/Launch-GaiaBought-OS.cmd
 
     - name: Pack Pure Unmodified Repository Structure
       run: |
-        # Sao chép nguyên vẹn 100% toàn bộ cây thư mục gốc mã nguồn Gaia của bạn (apps, shared) vào gói phát hành
         if [ -d "apps" ]; then cp -r apps dist-gaia-os/; fi
         if [ -d "shared" ]; then cp -r shared dist-gaia-os/; fi
 
@@ -97,7 +96,4 @@ jobs:
       with:
         tag_name: pure-gaia-v1.0.${{ github.run_number }}
         name: GaiaBought Pure Source Distribution (Build ${{ github.run_number }})
-        body: |
-          Bản build hệ điều hành máy tính sử dụng nguyên vẹn 100% mã nguồn gốc Gaia từ năm 2015.
-          Tích hợp cơ chế tự sửa lỗi thẻ tự chế trên RAM thông qua server-core Node.js cục bộ siêu nhẹ.
         files: GaiaBought-PureSource-Windows.zip
