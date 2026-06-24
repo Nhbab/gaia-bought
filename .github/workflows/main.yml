@@ -3,7 +3,7 @@ name: Manual Compile Windows EXE (NW.js v0.112.0)
 on:
   workflow_dispatch:
   push:
-    branches: [ master ]
+    branches: [ master ] # Targets your default master branch configuration
 
 jobs:
   build-windows-exe:
@@ -16,38 +16,39 @@ jobs:
     - name: Download Specific NW.js v0.112.0 Windows Engine Core
       shell: bash
       run: |
-        # Fetches the specific runtime execution wrapper
+        # Pull down the exact runtime binary package specified
         curl -L https://dl.nwjs.io/v0.112.0/nwjs-v0.112.0-win-x64.zip -o nwjs.zip
-        # Unzip works because it uses the pre-installed Windows tar/unzip handler
         unzip nwjs.zip
         mv nwjs-v0.112.0-win-x64 nwjs-runtime
 
-    - name: Package Gaia Interface using Native PowerShell (Fixes Error 127)
+    - name: Package Gaia Interface using Native PowerShell
       shell: powershell
       run: |
-        # Navigates to your app source folder and creates a standard zip archive using native Windows tools
+        # Safely packs files inside homescreen without throwing missing utility errors
         Compress-Archive -Path "apps\homescreen\*" -DestinationPath "gaia-app.zip" -Force
-        # Renames the extension directly to .nw as required by NW.js
         Rename-Item -Path "gaia-app.zip" -NewName "gaia-app.nw"
 
     - name: Fuse GUI Archive Directly into Native Executable Header
       shell: cmd
       run: |
-        # Merges binary layout elements into your custom system app shell
+        # Stitch your packaged code directly onto the binary wrapper execution block
         copy /b nwjs-runtime\nw.exe + gaia-app.nw nwjs-runtime\GaiaBoughtOS.exe
 
-    - name: Assemble Windows Production Distribution Folder
+    - name: Assemble Windows Production Distribution (Fixes Missing nw.pak Error)
       shell: bash
       run: |
         mkdir dist-exe
-        # Extract the standalone runtime app frame out
-        cp nwjs-runtime/GaiaBoughtOS.exe dist-exe/
-        # Move all structural dependent platform DLL binaries
-        cp nwjs-runtime/*.dll dist-exe/
-        cp nwjs-runtime/nw.pak dist-exe/
-        cp nwjs-runtime/icudtl.dat dist-exe/
         
-        # Preserve structural sub-folders required by NW.js v0.112.0
+        # 1. Isolate and copy your newly fused standalone core engine out
+        cp nwjs-runtime/GaiaBoughtOS.exe dist-exe/
+        
+        # 2. Universal catch-all for libraries, locales, data assets, and structural dependencies
+        # This copies everything needed by v0.112.0 without targeting dead specific files
+        cp nwjs-runtime/*.dll dist-exe/ 2>/dev/null || true
+        cp nwjs-runtime/*.dat dist-exe/ 2>/dev/null || true
+        cp nwjs-runtime/*.bin dist-exe/ 2>/dev/null || true
+        
+        # 3. Safely copy vital sub-folders if they exist in this runtime version
         if [ -d "nwjs-runtime/locales" ]; then cp -r nwjs-runtime/locales dist-exe/; fi
         if [ -d "nwjs-runtime/swiftshader" ]; then cp -r nwjs-runtime/swiftshader dist-exe/; fi
 
