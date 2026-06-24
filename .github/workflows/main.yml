@@ -1,8 +1,8 @@
-name: Compile Standalone Windows EXE Distribution
+name: Compile Standalone Windows EXE (NW.js v0.112.0)
 
 on:
   push:
-    branches: [ master ]
+    branches: [ master ] # Matches Nhbab/gaia-bought primary master branch
 
 jobs:
   build-windows-exe:
@@ -12,41 +12,45 @@ jobs:
     - name: Checkout Repository Code
       uses: actions/checkout@v4
 
-    - name: Download NW.js Windows Runtime Core
+    - name: Download Specific NW.js v0.112.0 Windows Engine Core
       shell: bash
       run: |
-        # Pulls down a stable, secure lightweight runtime shell environment
-        curl -L https://nwjs.io -o nwjs.zip
+        # Pulls down the exact runtime engine binary zip specified 
+        curl -L https://dl.nwjs.io/v0.112.0/nwjs-v0.112.0-win-x64.zip -o nwjs.zip
         unzip nwjs.zip
-        mv nwjs-v0.82.0-win-x64 nwjs-runtime
+        mv nwjs-v0.112.0-win-x64 nwjs-runtime
 
-    - name: Package Gaia Interface into Core Binary Archive
+    - name: Package Gaia Interface into NW Binary Package
       shell: bash
       run: |
         cd apps/homescreen
-        # Compresses the GUI logic code directly into a zip package partition
+        # Compresses the localized Web GUI core files cleanly into a zip layout
         zip -r ../../gaia-app.nw *
         cd ../..
 
-    - name: Fuse GUI Archive directly into Windows Executable Header
+    - name: Fuse GUI Archive Directly into Native Executable Header
       shell: cmd
       run: |
-        # Merges the compiled binary structures cleanly with no external dependencies
+        # Merges binary layout elements into your custom system app shell
         copy /b nwjs-runtime\nw.exe + gaia-app.nw nwjs-runtime\GaiaBoughtOS.exe
 
-    - name: Assemble Final Production Distribution Gated Build
+    - name: Assemble Windows Production Distribution Folder
       shell: bash
       run: |
         mkdir dist-exe
-        # Move the newly fused standalone application wrapper out
+        # Extract the standalone runtime app frame out
         cp nwjs-runtime/GaiaBoughtOS.exe dist-exe/
-        # Copy critical system support framework DLL binaries 
+        # Move all structural dependent platform DLL binaries
         cp nwjs-runtime/*.dll dist-exe/
         cp nwjs-runtime/nw.pak dist-exe/
         cp nwjs-runtime/icudtl.dat dist-exe/
+        
+        # Ensure optional sub-folders required by NW.js v0.112.0 are preserved
+        if [ -d "nwjs-runtime/locales" ]; then cp -r nwjs-runtime/locales dist-exe/; fi
+        if [ -d "nwjs-runtime/swiftshader" ]; then cp -r nwjs-runtime/swiftshader dist-exe/; fi
 
-    - name: Deploy Compiled Executable Bundle to GitHub
+    - name: Deploy Compiled Executable Build to GitHub Artifacts
       uses: actions/upload-artifact@v4
       with:
-        name: GaiaBought-Windows-EXE-Distribution
+        name: GaiaBought-Windows-EXE-v0.112.0
         path: dist-exe/
