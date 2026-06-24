@@ -28,55 +28,13 @@ jobs:
         mv nwjs-v0.86.0-win-x64 nwjs-runtime
         rm nwjs.zip
 
-    - name: Initialize Embedded Node Web Server Components
+    - name: Construct Standalone App Manifest Environment
       run: |
-        # Creates an independent background host routing execution directory
-        mkdir -p nwjs-runtime/server
-        cat << 'EOF' > nwjs-runtime/server/start-server.js
-        const http = require('http');
-        const fs = require('fs');
-        const path = require('path');
-
-        const PORT = 3000;
-        const BASE_DIR = path.resolve(path.join(__dirname, '..')); 
-
-        const MIME_TYPES = {
-            '.html': 'text/html',
-            '.css': 'text/css',
-            '.js': 'text/javascript',
-            '.json': 'application/json',
-            '.png': 'image/png',
-            '.properties': 'text/plain'
-        };
-
-        http.createServer((req, res) => {
-            let cleanUrl = req.url.split('?');
-            let targetPath = cleanUrl[0] === '/' ? '/apps/homescreen/index.html' : cleanUrl[0];
-            let filePath = path.join(BASE_DIR, targetPath);
-            let extname = String(path.extname(filePath)).toLowerCase();
-            let contentType = MIME_TYPES[extname] || 'application/octet-stream';
-
-            fs.readFile(filePath, (error, content) => {
-                if (error) {
-                    res.writeHead(404, { 'Content-Type': 'text/plain', 'Access-Control-Allow-Origin': '*' });
-                    res.end('File Not Found', 'utf-8');
-                } else {
-                    res.writeHead(200, { 'Content-Type': contentType, 'Access-Control-Allow-Origin': '*' });
-                    res.end(content, 'utf-8');
-                }
-            });
-        }).listen(PORT, '127.0.0.1', () => {
-            console.log(`Local Web Server routing successfully on port ${PORT}`);
-        });
-        EOF
-
-    - name: Inject Privileged Root Execution Manifest
-      run: |
-        # Forces Chromium 123 core to turn off hardware graphics sandboxing and local CORS restrictions
-        cat << 'EOF' > nwjs-runtime/package.json
+        # Creates a local manifest configuration tailored to resolve legacy cross-origin sandbox blocks
+        cat << 'EOF' > apps/homescreen/package.json
         {
           "name": "gaia-bought-desktop",
-          "main": "http://127.0.0",
+          "main": "index.html",
           "version": "1.0.0",
           "window": {
             "title": "Gaia Bought Desktop OS",
@@ -85,59 +43,45 @@ jobs:
             "frame": false,
             "show": true
           },
-          "chromium-args": "--disable-web-security --allow-file-access-from-files --disable-gpu-sandbox --mixed-context"
+          "chromium-args": "--disable-web-security --allow-file-access-from-files --disable-gpu --mixed-context"
         }
         EOF
 
-    - name: Build Multi-Process Windows Launcher Script (Fixed White Screen)
+    - name: Compile Application Web Components Tree
       run: |
-        # Launches the server module first, checks connection, then fires up the container layout frame
-        cat << 'EOF' > nwjs-runtime/GaiaBoughtOS.cmd
-        @echo off
-        title Initializing Gaia OS Shell Environment
-        cd /d "%~dp0"
+        # Combines your homescreen directory along with structural tracking pathways into the container folder
+        mkdir -p staging_package
+        cp -r apps/homescreen/* staging_package/
         
-        echo Launching Isolated Background Core Network Router...
-        echo Set WshShell = CreateObject("WScript.Shell") > launch_hidden.vbs
-        echo WshShell.Run "nw.exe server/start-server.js", 0, False >> launch_hidden.vbs
-        wscript.exe launch_hidden.vbs
-        del launch_hidden.vbs
-        
-        echo Waiting for network port binding...
-        timeout /t 3 /nobreak >nul
-        
-        echo Initializing Graphical Interface Panels...
-        start "" nw.exe package.json
-        exit
-        EOF
-        # Convert line endings to Windows standard CRLF format cleanly
-        sed -i 's/$/\r/' nwjs-runtime/GaiaBoughtOS.cmd
+        # Pulls in the structural shared source folders if tracked inside your repository branch layout
+        if [ -d "shared" ]; then cp -r shared staging_package/; fi
+        if [ -d "apps/shared" ]; then cp -r apps/shared staging_package/; fi
+
+    - name: Build Unified package.nw System Container
+      run: |
+        # Packs everything into the exact folder naming structure that NW.js runs natively on Windows
+        cd staging_package
+        zip -r ../nwjs-runtime/package.nw *
+        cd ..
 
     - name: Assemble Windows Production Distribution Folder
       run: |
         mkdir dist-exe
         
-        # 1. Migrate core engine files and launcher components out together
-        cp nwjs-runtime/GaiaBoughtOS.cmd dist-exe/
-        cp nwjs-runtime/nw.exe dist-exe/
-        cp nwjs-runtime/package.json dist-exe/
-        cp -r nwjs-runtime/server dist-exe/
+        # 1. Migrate core engine binary assets and package containers out together
+        cp nwjs-runtime/nw.exe dist-exe/GaiaBoughtOS.exe
+        cp nwjs-runtime/package.nw dist-exe/
         
-        # 2. Dynamic catch-all copying of dependent assets (Prevents runtime crash anomalies)
+        # 2. Dynamic catch-all copying of system dependencies (Prevents crash anomalies)
         cp nwjs-runtime/*.dll dist-exe/ 2>/dev/null || true
         cp nwjs-runtime/*.dat dist-exe/ 2>/dev/null || true
         cp nwjs-runtime/*.bin dist-exe/ 2>/dev/null || true
         cp nwjs-runtime/*.pak dist-exe/ 2>/dev/null || true
         if [ -d "nwjs-runtime/locales" ]; then cp -r nwjs-runtime/locales dist-exe/; fi
-        
-        # 3. Synchronize your unedited repository layout tree directories into the root distribution track
-        mkdir -p dist-exe/apps
-        if [ -d "apps" ]; then cp -r apps/* dist-exe/apps/; fi
-        if [ -d "shared" ]; then cp -r shared dist-exe/; fi
 
     - name: Generate Final Package Zip Archive
       run: |
-        # Zip up the entire bundle cleanly without using slow double compression
+        # Zip up the entire bundle cleanly without using slow double compression loops
         zip -r GaiaBought-Windows-EXE-v0.86.0.zip dist-exe/*
 
     - name: Upload Named Zip to GitHub Releases Section
@@ -147,7 +91,7 @@ jobs:
         name: GaiaBought Production Desktop v0.86.0 (Build ${{ github.run_number }})
         body: |
           Complete standalone desktop build for Nhbab/gaia-bought workspace.
-          Fixed localhost white blank rendering restrictions via root flag injections.
+          Fixed the localhost blank window render error by migrating structure to a native package.nw app container.
         files: GaiaBought-Windows-EXE-v0.86.0.zip
         draft: false
         prerelease: false
