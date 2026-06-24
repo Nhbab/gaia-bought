@@ -1,8 +1,9 @@
-name: Compile Standalone Windows EXE (NW.js v0.112.0)
+name: Manual Compile Windows EXE (NW.js v0.112.0)
 
 on:
+  workflow_dispatch:
   push:
-    branches: [ master ] # Matches Nhbab/gaia-bought primary master branch
+    branches: [ master ]
 
 jobs:
   build-windows-exe:
@@ -15,18 +16,19 @@ jobs:
     - name: Download Specific NW.js v0.112.0 Windows Engine Core
       shell: bash
       run: |
-        # Pulls down the exact runtime engine binary zip specified 
+        # Fetches the specific runtime execution wrapper
         curl -L https://dl.nwjs.io/v0.112.0/nwjs-v0.112.0-win-x64.zip -o nwjs.zip
+        # Unzip works because it uses the pre-installed Windows tar/unzip handler
         unzip nwjs.zip
         mv nwjs-v0.112.0-win-x64 nwjs-runtime
 
-    - name: Package Gaia Interface into NW Binary Package
-      shell: bash
+    - name: Package Gaia Interface using Native PowerShell (Fixes Error 127)
+      shell: powershell
       run: |
-        cd apps/homescreen
-        # Compresses the localized Web GUI core files cleanly into a zip layout
-        zip -r ../../gaia-app.nw *
-        cd ../..
+        # Navigates to your app source folder and creates a standard zip archive using native Windows tools
+        Compress-Archive -Path "apps\homescreen\*" -DestinationPath "gaia-app.zip" -Force
+        # Renames the extension directly to .nw as required by NW.js
+        Rename-Item -Path "gaia-app.zip" -NewName "gaia-app.nw"
 
     - name: Fuse GUI Archive Directly into Native Executable Header
       shell: cmd
@@ -45,7 +47,7 @@ jobs:
         cp nwjs-runtime/nw.pak dist-exe/
         cp nwjs-runtime/icudtl.dat dist-exe/
         
-        # Ensure optional sub-folders required by NW.js v0.112.0 are preserved
+        # Preserve structural sub-folders required by NW.js v0.112.0
         if [ -d "nwjs-runtime/locales" ]; then cp -r nwjs-runtime/locales dist-exe/; fi
         if [ -d "nwjs-runtime/swiftshader" ]; then cp -r nwjs-runtime/swiftshader dist-exe/; fi
 
