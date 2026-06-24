@@ -1,97 +1,103 @@
-name: Compile and Release Fixed Windows EXE (v0.86.0)
+name: Build Pure Gaia Source Code Windows App
 
 on:
   workflow_dispatch:
   push:
-    branches: [ master ] # Targets your specific master branch configuration
+    branches: [ master ]
 
 permissions:
-  contents: write # Essential flag allowing GitHub to publish release packages
+  contents: write
 
 jobs:
-  build-and-release:
-    # Executes on an Ubuntu runner to guarantee native zip and folder commands succeed
+  build-pure-gaia:
     runs-on: ubuntu-latest
 
     steps:
-    - name: Checkout Repository Code
+    - name: Checkout Original Repository Code
       uses: actions/checkout@v4
 
-    - name: Download Exact Legacy NW.js v0.86.0 Core Engine
+    - name: Generate Desktop Launcher Shell Environment
       run: |
-        # Pull down your exact required engine layer binary zip link
-        curl -L --connect-timeout 20 --retry 5 \
-          "https://dl.nwjs.io/v0.86.0/nwjs-v0.86.0-win-x64.zip" -o nwjs.zip
+        mkdir -p dist-gaia-os
         
-        # Extract archive instantly using native Linux decompression tools
-        unzip nwjs.zip
-        mv nwjs-v0.86.0-win-x64 nwjs-runtime
-        rm nwjs.zip
+        # 1. Tạo tệp máy chủ Node.js siêu nhẹ để xử lý lỗi đường dẫn cha (../shared/) và thẻ gaia-container tự động trên RAM
+        cat << 'EOF' > dist-gaia-os/server-core.js
+        const http = require('http');
+        const fs = require('fs');
+        const path = require('path');
 
-    - name: Construct Standalone App Manifest Environment
-      run: |
-        # Creates a local manifest configuration tailored to resolve legacy cross-origin sandbox blocks
-        cat << 'EOF' > apps/homescreen/package.json
-        {
-          "name": "gaia-bought-desktop",
-          "main": "index.html",
-          "version": "1.0.0",
-          "window": {
-            "title": "Gaia Bought Desktop OS",
-            "toolbar": false,
-            "fullscreen": true,
-            "frame": false,
-            "show": true
-          },
-          "chromium-args": "--disable-web-security --allow-file-access-from-files --disable-gpu --mixed-context"
-        }
+        const PORT = 3000;
+        const BASE_DIR = __dirname; // Định vị trực tiếp tại thư mục giải nén
+
+        const MIME_TYPES = {
+            '.html': 'text/html',
+            '.css': 'text/css',
+            '.js': 'text/javascript',
+            '.json': 'application/json',
+            '.png': 'image/png',
+            '.properties': 'text/plain'
+        };
+
+        http.createServer((req, res) => {
+            let cleanUrl = req.url.split('?')[0];
+            let targetPath = cleanUrl === '/' ? '/apps/homescreen/index.html' : cleanUrl;
+            let filePath = path.join(BASE_DIR, targetPath);
+            let extname = String(path.extname(filePath)).toLowerCase();
+            let contentType = MIME_TYPES[extname] || 'application/octet-stream';
+
+            fs.readFile(filePath, 'utf8', (error, content) => {
+                if (error) {
+                    res.writeHead(404, { 'Content-Type': 'text/plain', 'Access-Control-Allow-Origin': '*' });
+                    res.end('File Not Found');
+                } else {
+                    // SỬA LỖI ĐÓNG BĂNG VÀ LỖI THẺ GAIA NGAY TRÊN RAM (GIỮ NGUYÊN CODE GỐC)
+                    if (filePath.endsWith('index.html')) {
+                        content = content.replace('<head>', '<head><script>if(!navigator.mozApps){navigator.mozApps={mgmt:{getAll:function(){return{set onsuccess(cb){setTimeout(()=>cb({target:{result:[]}}),50)},set onerror(cb){}}}}};if(!customElements.get("gaia-container")){customElements.define("gaia-container",class extends HTMLElement{freeze(){}thaw(){}removeChild(e,c){e.remove();if(c)c()}})}</script>');
+                    }
+                    res.writeHead(200, { 'Content-Type': contentType, 'Access-Control-Allow-Origin': '*' });
+                    res.end(content);
+                }
+            });
+        }).listen(PORT, '127.0.0.1');
+        console.log(`Gaia Server Active on Port ${PORT}`);
         EOF
 
-    - name: Compile Application Web Components Tree
-      run: |
-        # Combines your homescreen directory along with structural tracking pathways into the container folder
-        mkdir -p staging_package
-        cp -r apps/homescreen/* staging_package/
+        # 2. Tạo tệp lệnh khởi chạy kép tự động (Bật server ngầm trước, mở Edge App Mode toàn màn hình sau)
+        cat << 'EOF' > dist-gaia-os/Launch-GaiaBought-OS.cmd
+        @echo off
+        title Initializing Firefox OS Gaia Interface
+        cd /d "%~dp0"
+
+        echo Booting Background Streaming Server Core...
+        start "" /b node server-core.js
+        timeout /t 2 /nobreak >nul
+
+        echo Initializing Graphical User Interface...
+        # Gọi nhân Edge có sẵn trên Windows khởi chạy dưới dạng một Ứng dụng Hệ điều hành độc lập không viền
+        powershell -NoProfile -Command "Start-Process 'msedge.exe' -ArgumentList '--app=\"http://127.0.0\"', '--disable-web-security', '--allow-file-access-from-files', '--no-first-run' -WindowStyle Maximized"
         
-        # Pulls in the structural shared source folders if tracked inside your repository branch layout
-        if [ -d "shared" ]; then cp -r shared staging_package/; fi
-        if [ -d "apps/shared" ]; then cp -r apps/shared staging_package/; fi
-
-    - name: Build Unified package.nw System Container
-      run: |
-        # Packs everything into the exact folder naming structure that NW.js runs natively on Windows
-        cd staging_package
-        zip -r ../nwjs-runtime/package.nw *
-        cd ..
-
-    - name: Assemble Windows Production Distribution Folder
-      run: |
-        mkdir dist-exe
+        exit
+        EOF
         
-        # 1. Migrate core engine binary assets and package containers out together
-        cp nwjs-runtime/nw.exe dist-exe/GaiaBoughtOS.exe
-        cp nwjs-runtime/package.nw dist-exe/
-        
-        # 2. Dynamic catch-all copying of system dependencies (Prevents crash anomalies)
-        cp nwjs-runtime/*.dll dist-exe/ 2>/dev/null || true
-        cp nwjs-runtime/*.dat dist-exe/ 2>/dev/null || true
-        cp nwjs-runtime/*.bin dist-exe/ 2>/dev/null || true
-        cp nwjs-runtime/*.pak dist-exe/ 2>/dev/null || true
-        if [ -d "nwjs-runtime/locales" ]; then cp -r nwjs-runtime/locales dist-exe/; fi
+        # Đồng bộ hóa định dạng kết thúc dòng tương thích 100% với Windows Command Prompt
+        sed -i 's/$/\r/' dist-gaia-os/Launch-GaiaBought-OS.cmd
 
-    - name: Generate Final Package Zip Archive
+    - name: Pack Pure Unmodified Repository Structure
       run: |
-        # Zip up the entire bundle cleanly without using slow double compression loops
-        zip -r GaiaBought-Windows-EXE-v0.86.0.zip dist-exe/*
+        # Sao chép nguyên vẹn 100% toàn bộ cây thư mục gốc mã nguồn Gaia của bạn (apps, shared) vào gói phát hành
+        if [ -d "apps" ]; then cp -r apps dist-gaia-os/; fi
+        if [ -d "shared" ]; then cp -r shared dist-gaia-os/; fi
 
-    - name: Upload Named Zip to GitHub Releases Section
+    - name: Generate Final Compressed Package Zip Archive
+      run: |
+        zip -r GaiaBought-PureSource-Windows.zip dist-gaia-os/*
+
+    - name: Deploy Compiled Package to GitHub Releases Section
       uses: softprops/action-gh-release@v2
       with:
-        tag_name: v0.86.0-${{ github.run_number }}
-        name: GaiaBought Production Desktop v0.86.0 (Build ${{ github.run_number }})
+        tag_name: pure-gaia-v1.0.${{ github.run_number }}
+        name: GaiaBought Pure Source Distribution (Build ${{ github.run_number }})
         body: |
-          Complete standalone desktop build for Nhbab/gaia-bought workspace.
-          Fixed the localhost blank window render error by migrating structure to a native package.nw app container.
-        files: GaiaBought-Windows-EXE-v0.86.0.zip
-        draft: false
-        prerelease: false
+          Bản build hệ điều hành máy tính sử dụng nguyên vẹn 100% mã nguồn gốc Gaia từ năm 2015.
+          Tích hợp cơ chế tự sửa lỗi thẻ tự chế trên RAM thông qua server-core Node.js cục bộ siêu nhẹ.
+        files: GaiaBought-PureSource-Windows.zip
