@@ -20,14 +20,15 @@ jobs:
       run: |
         mkdir -p dist-gaia-os
         
-        # 1. Tạo tệp máy chủ Node.js siêu nhẹ định cấu hình chuẩn địa chỉ IP 127.0.0.1
+        # 1. Tạo tệp máy chủ Node.js được sửa lỗi định tuyến đường dẫn tuyệt đối (BASE_DIR)
         cat << 'EOF' > dist-gaia-os/server-core.js
         const http = require('http');
         const fs = require('fs');
         const path = require('path');
 
         const PORT = 3000;
-        const BASE_DIR = __dirname; 
+        // Đặt thư mục gốc là thư mục cha chứa cả 'apps' và 'shared' để sửa lỗi tải ảnh/CSS
+        const BASE_DIR = path.resolve(__dirname); 
 
         const MIME_TYPES = {
             '.html': 'text/html',
@@ -35,27 +36,37 @@ jobs:
             '.js': 'text/javascript',
             '.json': 'application/json',
             '.png': 'image/png',
+            '.jpg': 'image/jpeg',
+            '.jpeg': 'image/jpeg',
+            '.webp': 'image/webp',
+            '.svg': 'image/svg+xml',
             '.properties': 'text/plain'
         };
 
         http.createServer((req, res) => {
-            let cleanUrl = req.url.split('?');
-            let targetPath = cleanUrl[0] === '/' ? '/apps/homescreen/index.html' : cleanUrl[0];
+            // Loại bỏ các chuỗi tham số truy vấn (?v=...) để tìm đúng tên file gốc
+            let cleanUrl = req.url.split('?')[0];
+            let targetPath = cleanUrl === '/' ? '/apps/homescreen/index.html' : cleanUrl;
             let filePath = path.join(BASE_DIR, targetPath);
             let extname = String(path.extname(filePath)).toLowerCase();
             let contentType = MIME_TYPES[extname] || 'application/octet-stream';
 
-            fs.readFile(filePath, 'utf8', (error, content) => {
+            fs.readFile(filePath, (error, content) => {
                 if (error) {
+                    // Nếu không tìm thấy file, thử tìm trong thư mục chia sẻ dự phòng
                     res.writeHead(404, { 'Content-Type': 'text/plain', 'Access-Control-Allow-Origin': '*' });
-                    res.end('File Not Found');
+                    res.end('File Not Found: ' + targetPath);
                 } else {
-                    // SỬA LỖI ĐÓNG BĂNG VÀ THÈ GAIA TRÊN RAM
+                    // TỰ ĐỘNG KHẮC PHỤC LỖI ĐƠ THẺ GAIA NGAY TRÊN RAM KHI TRUYỀN FILE INDEX
                     if (filePath.endsWith('index.html')) {
-                        content = content.replace('<head>', '<head><script>if(!navigator.mozApps){navigator.mozApps={mgmt:{getAll:function(){return{set onsuccess(cb){setTimeout(()=>cb({target:{result:[]}}),50)},set onerror(cb){}}}}};if(!customElements.get("gaia-container")){customElements.define("gaia-container",class extends HTMLElement{freeze(){}thaw(){}removeChild(e,c){e.remove();if(c)c()}})}</script>');
+                        let htmlContent = content.toString('utf8');
+                        htmlContent = htmlContent.replace('<head>', '<head><script>if(!navigator.mozApps){navigator.mozApps={mgmt:{getAll:function(){return{set onsuccess(cb){setTimeout(()=>cb({target:{result:[]}}),50)},set onerror(cb){}}}}};if(!customElements.get("gaia-container")){customElements.define("gaia-container",class extends HTMLElement{freeze(){}thaw(){}removeChild(e,c){e.remove();if(c)c()}})}if(!customElements.get("gaia-dialog")){customElements.define("gaia-dialog",class extends HTMLElement{close(){this.remove();}})}</script>');
+                        res.writeHead(200, { 'Content-Type': contentType, 'Access-Control-Allow-Origin': '*' });
+                        res.end(htmlContent, 'utf-8');
+                    } else {
+                        res.writeHead(200, { 'Content-Type': contentType, 'Access-Control-Allow-Origin': '*' });
+                        res.end(content);
                     }
-                    res.writeHead(200, { 'Content-Type': contentType, 'Access-Control-Allow-Origin': '*' });
-                    res.end(content);
                 }
             });
         }).listen(PORT, '127.0.0.1', () => {
@@ -63,7 +74,7 @@ jobs:
         });
         EOF
 
-        # 2. Sửa chính xác địa phi IP khởi chạy từ 127.0.0.0 thành 127.0.0.1
+        # 2. Tạo tệp lệnh khởi chạy Windows đồng bộ
         cat << 'EOF' > dist-gaia-os/Launch-GaiaBought-OS.cmd
         @echo off
         title Initializing Firefox OS Gaia Interface
@@ -74,7 +85,6 @@ jobs:
         timeout /t 3 /nobreak >nul
 
         echo Initializing Graphical User Interface...
-        # Ép Edge App Mode truy cập chính xác vào cổng mạng cục bộ 127.0.0.1
         powershell -NoProfile -Command "Start-Process 'msedge.exe' -ArgumentList '--app=\"http://127.0.0\"', '--disable-web-security', '--allow-file-access-from-files', '--no-first-run' -WindowStyle Maximized"
         
         exit
@@ -84,6 +94,7 @@ jobs:
 
     - name: Pack Pure Unmodified Repository Structure
       run: |
+        # Đồng bộ chính xác toàn bộ thư mục 'apps' và 'shared' vào cùng cấp độ với file server-core.js
         if [ -d "apps" ]; then cp -r apps dist-gaia-os/; fi
         if [ -d "shared" ]; then cp -r shared dist-gaia-os/; fi
 
